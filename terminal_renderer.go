@@ -3,8 +3,10 @@ package uv
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"hash/maphash"
 	"io"
+	"os"
 	"strings"
 	"unicode/utf8"
 
@@ -1515,9 +1517,24 @@ func (s *TerminalRenderer) Render(newbuf *RenderBuffer) {
 			// A repaintAll row has to be put back whatever the model says.
 			if size.repaintAll || s.damaged[i] || (newbuf.Touched[i] != nil &&
 				(newbuf.Touched[i].FirstCell != -1 || newbuf.Touched[i].LastCell != -1)) {
-				s.paintLine(newbuf, i, size.repaintAll)
+				before := s.buf.Len()
+				// [eva-go fork] 恒 force：整行重写，不再信任 curbuf 与终端的
+				// 一致性。实测（2026-10-04 eva-go 渲染崩塌）diff 认定的"无变
+				// 化行"在终端上可能缺失（模型与终端显示脱节后永久跳行，输入
+				// 框边框/footer 整行消失）。全帧行级重写与 ink 每帧全量渲染
+				// 同模式，alacritty 原子帧下无闪烁压力。
+				s.paintLine(newbuf, i, true)
 				changedLines++
+				// [uvdbg] 每行绘制决策跟踪（BTFORK_LOOP_DBG 门控）：
+				// y、写入字节数——丢行排查用
+				if os.Getenv("BTFORK_LOOP_DBG") != "" {
+					fmt.Fprintf(os.Stderr, "[uvdbg line] y=%d wrote=%d\n", i, s.buf.Len()-before)
+				}
 			}
+		}
+		if os.Getenv("BTFORK_LOOP_DBG") != "" {
+			fmt.Fprintf(os.Stderr, "[uvdbg render] nonEmpty=%d changed=%d bufAfter=%d touched=%d\n",
+				nonEmpty, changedLines, s.buf.Len(), touchedLines)
 		}
 	}
 
