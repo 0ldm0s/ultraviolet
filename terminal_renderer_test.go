@@ -75,7 +75,9 @@ func TestInlineRendererOutput(t *testing.T) {
 		t.Fatalf("failed to flush renderer: %v", err)
 	}
 
-	expected := "\rHello, World!"
+	// 恒 force 契约快照（renderer-force-redraw-test-ruling.md）：行内容
+	// 前带 \x1b[K 清行。
+	expected := "\r\x1b[KHello, World!"
 	if buf.String() != expected {
 		t.Errorf("expected output:\n%q\nbut got:\n%q", expected, buf.String())
 	}
@@ -653,9 +655,9 @@ func TestRendererSwitchBuffer(t *testing.T) {
 	}
 
 	output := buf.String()
-	// Home, draw X at (0,0); erase it, since the new frame's row 0 is blank;
-	// newline, draw X at (0,1); pad cursor to row 5.
-	expected := "\x1b[HX\r\x1b[K\nX\r\n\n\n\n"
+	// 恒 force 契约快照（renderer-force-redraw-test-ruling.md）：resize 后
+	// 全帧逐行 \x1b[K+行内容重绘（含空行）。
+	expected := "\x1b[H\x1b[KX\r\x1b[K\n\x1b[KX\r\n\x1b[K\n\x1b[K\n\x1b[K\n\x1b[K"
 	if output != expected {
 		t.Errorf("expected output after resize to be %q, got: %q", expected, output)
 	}
@@ -1113,9 +1115,11 @@ func TestRendererPhantomCursor(t *testing.T) {
 	}
 
 	output := buf.String()
-	expected := "\x1b[1;5HX\r\n\x1b[5GX\r\n\x1b[5G\x1b[?7lX\x1b[?7h"
+	// 恒 force 契约快照（renderer-force-redraw-test-ruling.md）：全帧逐行
+	// \x1b[K+行内容重绘（phantom cursor 场景不再有 diff 免输出豁免）。
+	expected := "\x1b[H\x1b[K    X\r\n\x1b[K    X\r\n\x1b[K    \x1b[?7lX\x1b[?7h"
 	if output != expected {
-		t.Errorf("expected no output for phantom cursor case, got: %q", output)
+		t.Errorf("expected output for phantom cursor case to be %q, got: %q", expected, output)
 	}
 }
 
@@ -1222,17 +1226,18 @@ func TestRendererUpdates(t *testing.T) {
 				"A",
 				"\x1b[1mA",
 			},
+			// 恒 force 契约快照（renderer-force-redraw-test-ruling.md）
 			expected: []string{
-				"\rA",
-				"\r\x1b[1mA\x1b[m",
+				"\r\x1b[KA\r\n\x1b[K\n\x1b[K",
+				"\x1b[2A\x1b[K\x1b[1mA\x1b[m\r\n\x1b[K\n\x1b[K",
 			},
 		},
 		{
 			name:   "style and link change",
 			frames: []string{"A", "\x1b[31m\x1b]8;;https://example.com\x1b\\A\x1b]8;;\x1b\\"}, // red + link
 			expected: []string{
-				"\rA",
-				"\r\x1b[31m\x1b]8;;https://example.com\aA\x1b[m\x1b]8;;\a",
+				"\r\x1b[KA\r\n\x1b[K\n\x1b[K",
+				"\x1b[2A\x1b[K\x1b[31m\x1b]8;;https://example.com\aA\x1b[m\x1b]8;;\a\r\n\x1b[K\n\x1b[K",
 			},
 		},
 		{
@@ -1244,10 +1249,11 @@ func TestRendererUpdates(t *testing.T) {
 				" \x1b[38;2;255;128;0mABC\n DEF", // orange
 				" \x1b[38;2;255;128;0mABC\n DEF", // orange
 			},
+			// 恒 force：重复帧也全量重绘（旧 diff 对相同帧产空输出的优化不再存在）
 			expected: []string{
-				"\r \x1b[38;5;208mABC\x1b[m\r\n\x1b[38;5;208m DEF\x1b[m",
-				"",
-				"",
+				"\r\x1b[K \x1b[38;5;208mABC\x1b[m\r\n\x1b[K\x1b[38;5;208m DEF\x1b[m\r\n\x1b[K",
+				"\x1b[2A\x1b[K \x1b[38;5;208mABC\x1b[m\r\n\x1b[K\x1b[38;5;208m DEF\x1b[m\r\n\x1b[K",
+				"\x1b[2A\x1b[K \x1b[38;5;208mABC\x1b[m\r\n\x1b[K\x1b[38;5;208m DEF\x1b[m\r\n\x1b[K",
 			},
 		},
 	}
@@ -1299,7 +1305,9 @@ func TestRendererPrependOneLine(t *testing.T) {
 	}
 
 	output := buf.String()
-	expected := "\x1b[HThis-is-a\r\n\n\n\n\n\n\x1b[H\x1b[2LPrepended-a-new-line\r\n"
+	// 恒 force 契约快照（renderer-force-redraw-test-ruling.md）：两帧均为
+	// 全帧逐行 \x1b[K+行内容重绘。
+	expected := "\x1b[H\x1b[KThis-is-a\r\n\x1b[K\n\x1b[K\n\x1b[K\n\x1b[K\n\n\x1b[H\x1b[2LPrepended-a-new-line\r\n\x1b[KThis-is-a\r\n\x1b[K\n\x1b[K\n\x1b[K\n\x1b[K"
 	if output != expected {
 		t.Errorf("expected output to be %q, got: %q", expected, output)
 	}
@@ -1474,7 +1482,9 @@ func TestRendererInlineResizeKeepsCursorModel(t *testing.T) {
 
 	// Cursor is on row 2 after the first render, so reaching row 0 has to move
 	// up. Without the two-row move the "b" lands on row 2.
-	expected := "\r\x1b[2Ab"
+	// 恒 force 契约快照（renderer-force-redraw-test-ruling.md）："b" 前带
+	// \x1b[K 清行。
+	expected := "\r\x1b[2A\x1b[Kb"
 	if output := buf.String(); output != expected {
 		t.Errorf("expected output after resize to be %q, got: %q", expected, output)
 	}
@@ -1508,10 +1518,9 @@ func TestRendererInlineShrinkClearsPartially(t *testing.T) {
 		t.Fatalf("failed to flush renderer: %v", err)
 	}
 
-	// Erase from row 2, the row the frame gave up, then up to row 1 to write the
-	// cell that changed. The erase no longer reaches into the frame, so row 1 is
-	// written because the application drew into it, not to put it back.
-	expected := "\r\x1b[J\x1bMb\r"
+	// 恒 force 契约快照（renderer-force-redraw-test-ruling.md）：shrink 后
+	// 全帧逐行 \x1b[K+行内容重绘（\x1b[J 区域擦除保留）。
+	expected := "\r\x1b[J\x1b[2A\x1b[Ka\r\n\x1b[Kb\r"
 	if output := buf.String(); output != expected {
 		t.Errorf("expected output after shrink to be %q, got: %q", expected, output)
 	}
@@ -1587,9 +1596,12 @@ func TestRendererInlineShrinkLeavesItsOwnRowsAlone(t *testing.T) {
 	if !strings.Contains(out, ansi.EraseScreenBelow) {
 		t.Fatalf("expected the shrink to erase below the frame, got: %q", out)
 	}
-	if strings.Contains(out, "a") {
-		t.Errorf("row 1 survives the shrink, so the erase should have left it alone "+
-			"rather than taking it and painting it back: %q", out)
+	// 恒 force 契约快照（renderer-force-redraw-test-ruling.md）：存活行
+	// row 1 的 "a" 也被等价重绘（内容不变、视觉零差异）——旧的"存活行
+	// 不重绘"语义是 diff 优化的产物，恒 force 下不再成立。
+	expected := "\r\n\x1b[J\x1b[2A\x1b[K\n\x1b[Ka\r"
+	if out != expected {
+		t.Errorf("expected output after shrink to be %q, got: %q", expected, out)
 	}
 }
 

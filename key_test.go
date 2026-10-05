@@ -759,13 +759,14 @@ func TestParseSequence(t *testing.T) {
 		seqTest{
 			[]byte{ansi.NUL},
 			[]Event{
-				KeyPressEvent{Code: KeySpace, Mod: ModCtrl},
+				ignoredEvent("NUL"), // NUL 被忽略（mintty shift+tab 伴生字节的幽灵输入修复）
 			},
 		},
 		seqTest{
 			[]byte{'\x1b', ansi.NUL},
 			[]Event{
-				KeyPressEvent{Code: KeySpace, Mod: ModCtrl | ModAlt},
+				KeyPressEvent{Code: KeyEscape}, // NUL 被忽略后 ESC 前缀回退为 Escape
+				ignoredEvent("NUL"),
 			},
 		},
 		// C1 control characters.
@@ -1141,12 +1142,12 @@ func TestReadInput(t *testing.T) {
 		{
 			"ctrl+space",
 			[]byte{'\x00'},
-			[]Event{KeyPressEvent{Code: KeySpace, Mod: ModCtrl}},
+			nil, // NUL 被忽略（mintty shift+tab 伴生字节的幽灵输入修复），不产出事件
 		},
 		{
 			"ctrl+alt+space",
 			[]byte{'\x1b', '\x00'},
-			[]Event{KeyPressEvent{Code: KeySpace, Mod: ModCtrl | ModAlt}},
+			[]Event{KeyPressEvent{Code: KeyEscape}}, // NUL 被忽略后 ESC 前缀回退为 Escape
 		},
 		{
 			"esc",

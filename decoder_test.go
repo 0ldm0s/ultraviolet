@@ -462,7 +462,7 @@ func TestParseControl(t *testing.T) {
 			name:      "NUL without CtrlAt flag",
 			input:     ansi.NUL,
 			legacy:    0,
-			wantEvent: KeyPressEvent{Code: KeySpace, Mod: ModCtrl},
+			wantEvent: ignoredEvent("NUL"),
 		},
 		{
 			name:      "BS (backspace)",

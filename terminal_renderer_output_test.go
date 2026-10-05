@@ -16,9 +16,11 @@ func TestRendererOutput(t *testing.T) {
 		expected  []string
 	}{
 		{
+			// 恒 force 输出契约快照（renderer-force-redraw-test-ruling.md）：
+			// 每帧光标归位 + 逐行 \x1b[K+行内容（含未变化行）。
 			name:     "scroll to bottom in inline mode",
 			input:    []string{"ABC", "XXX"},
-			expected: []string{"\rABC", "\rXXX"},
+			expected: []string{"\r\x1b[KABC\r\n\x1b[K\n\x1b[K\n\x1b[K\n\x1b[K", "\x1b[4A\x1b[KXXX\r\n\x1b[K\n\x1b[K\n\x1b[K\n\x1b[K"},
 			relative: true,
 		},
 		{
@@ -31,17 +33,12 @@ func TestRendererOutput(t *testing.T) {
 				true,
 				true,
 			},
+			// 恒 force 下逐行重写，scroll 优化（\x1bS/\x1bM 序列）不再产生
+			// 平台差异，isWindows 分支合并。
 			expected: func() []string {
-				if isWindows {
-					return []string{
-						"\x1b[H\x1b[2JLorem ipsu\r\nm dolor si\r\nt amet, co\r\nnsectetur\r\nadipiscin\x1b[?7lg\x1b[?7h",
-						"\x1b[Hm dolor si\r\nt amet, co\r\nnsectetur\x1b[K\r\nadipiscing\r\n elit. Vi\x1b[?7lv\x1b[?7h",
-					}
-				} else {
-					return []string{
-						"\x1b[H\x1b[2JLorem ipsu\r\nm dolor si\r\nt amet, co\r\nnsectetur\r\nadipiscin\x1b[?7lg\x1b[?7h",
-						"\r\n elit. Vi\x1b[?7lv\x1b[?7h",
-					}
+				return []string{
+					"\x1b[H\x1b[2JLorem ipsu\r\nm dolor si\r\nt amet, co\r\nnsectetur\r\nadipiscin\x1b[?7lg\x1b[?7h",
+					"\x1b[H\x1b[Km dolor si\r\n\x1b[Kt amet, co\r\n\x1b[Knsectetur\r\n\x1b[Kadipiscing\r\n\x1b[K elit. Vi\x1b[?7lv\x1b[?7h",
 				}
 			}(),
 			altscreen: true,
@@ -57,16 +54,9 @@ func TestRendererOutput(t *testing.T) {
 				true,
 			},
 			expected: func() []string {
-				if isWindows {
-					return []string{
-						"\x1b[H\x1b[2JLorem ipsu\r\nm dolor si\r\nt amet, co\r\nnsectetur\r\nadipiscin\x1b[?7lg\x1b[?7h",
-						"\x1b[Ht amet, co\r\nnsectetur\x1b[K\r\nadipiscing\r\n elit. Viv\r\namus at o\x1b[?7lr\x1b[?7h",
-					}
-				} else {
-					return []string{
-						"\x1b[H\x1b[2JLorem ipsu\r\nm dolor si\r\nt amet, co\r\nnsectetur\r\nadipiscin\x1b[?7lg\x1b[?7h",
-						"\r\x1b[2S\x1bM elit. Viv\r\namus at o\x1b[?7lr\x1b[?7h",
-					}
+				return []string{
+					"\x1b[H\x1b[2JLorem ipsu\r\nm dolor si\r\nt amet, co\r\nnsectetur\r\nadipiscin\x1b[?7lg\x1b[?7h",
+					"\x1b[H\x1b[Kt amet, co\r\n\x1b[Knsectetur\r\n\x1b[Kadipiscing\r\n\x1b[K elit. Viv\r\n\x1b[Kamus at o\x1b[?7lr\x1b[?7h",
 				}
 			}(),
 			altscreen: true,
@@ -82,16 +72,9 @@ func TestRendererOutput(t *testing.T) {
 				true,
 			},
 			expected: func() []string {
-				if isWindows {
-					return []string{
-						"\x1b[H\x1b[2JABC\r\nDEF\r\nGHI",
-						"\r\x1bM\x1b[K\nDEF\r\nGHI",
-					}
-				} else {
-					return []string{
-						"\x1b[H\x1b[2JABC\r\nDEF\r\nGHI",
-						"\r\x1bM\x1b[L",
-					}
+				return []string{
+					"\x1b[H\x1b[2JABC\r\nDEF\r\nGHI",
+					"\x1b[H\x1b[KABC\r\n\x1b[K\n\x1b[KDEF\r\n\x1b[KGHI\r\n\x1b[K",
 				}
 			}(),
 			altscreen: true,
@@ -103,8 +86,8 @@ func TestRendererOutput(t *testing.T) {
 				"\nABCE      ",
 			},
 			expected: []string{
-				"\x1b[2;1HABCEFGHIJK",
-				"\r\x1b[5G\x1b[K",
+				"\x1b[H\x1b[K\n\x1b[KABCEFGHIJK\r\n\x1b[K\n\x1b[K\n\x1b[K",
+				"\x1b[H\x1b[K\n\x1b[KABCE\r\n\x1b[K\n\x1b[K\n\x1b[K",
 			},
 		},
 	}

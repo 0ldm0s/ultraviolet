@@ -1129,7 +1129,11 @@ func (p *EventDecoder) parseControl(b byte) Event {
 		if p.Legacy&flagCtrlAt != 0 {
 			return KeyPressEvent{Code: '@', Mod: ModCtrl}
 		}
-		return KeyPressEvent{Code: KeySpace, Mod: ModCtrl}
+		// NUL（\x00）在部分终端输入路径（如 mintty 对 shift+tab 的编码）
+		// 作为伴生字节出现；孤立的 NUL 没有应用消费语义，解码成
+		// Ctrl+Space 会造成幽灵输入（空格插入+光标移动）。按既有忽略
+		// 语义吞掉：消费字节、不产出按键事件。
+		return ignoredEvent("NUL")
 	case ansi.BS:
 		return KeyPressEvent{Code: 'h', Mod: ModCtrl}
 	case ansi.HT:

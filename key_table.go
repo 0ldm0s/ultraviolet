@@ -11,11 +11,6 @@ import (
 // buildKeysTable builds a table of key sequences and their corresponding key
 // events based on the VT100/VT200, XTerm, and Urxvt terminal specs.
 func buildKeysTable(flags LegacyKeyEncoding, term string, useTerminfo bool) map[string]Key {
-	nul := Key{Code: KeySpace, Mod: ModCtrl} // ctrl+@ or ctrl+space
-	if flags&flagCtrlAt != 0 {
-		nul = Key{Code: '@', Mod: ModCtrl}
-	}
-
 	tab := Key{Code: KeyTab} // ctrl+i or tab
 	if flags&flagCtrlI != 0 {
 		tab = Key{Code: 'i', Mod: ModCtrl}
@@ -56,7 +51,10 @@ func buildKeysTable(flags LegacyKeyEncoding, term string, useTerminfo bool) map[
 	// Terminfo.
 	table := map[string]Key{
 		// C0 control characters
-		string(byte(ansi.NUL)): nul,
+		// NOTE: NUL（\x00）不进默认表——部分终端（mintty）对 shift+tab 等
+		// 组合键会伴生 NUL 字节，默认解码层忽略之（见 decoder.go
+		// parseControl 的 ignoredEvent）；flagCtrlAt 显式启用时仍按下述
+		// nul 值编码。
 		string(byte(ansi.SOH)): {Code: 'a', Mod: ModCtrl},
 		string(byte(ansi.STX)): {Code: 'b', Mod: ModCtrl},
 		string(byte(ansi.ETX)): {Code: 'c', Mod: ModCtrl},
@@ -388,6 +386,12 @@ func buildKeysTable(flags LegacyKeyEncoding, term string, useTerminfo bool) map[
 		for seq, key := range titable {
 			table[seq] = key
 		}
+	}
+
+	// NUL 仅在显式启用 flagCtrlAt 时进表（Ctrl+@ 编码）；默认不进表，
+	// 由解码层忽略——防止组合键伴生 NUL 造成幽灵 Ctrl+Space 输入。
+	if flags&flagCtrlAt != 0 {
+		table[string(byte(ansi.NUL))] = Key{Code: '@', Mod: ModCtrl}
 	}
 
 	return table
